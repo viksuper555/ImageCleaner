@@ -66,7 +66,7 @@ if col1.button("Find Duplicates"):
     st.rerun()
 if st.session_state.no_duplicates:
     col1.info("No duplicates found.")
-if st.session_state.duplicate_groups and col2.button("Clear Duplicates"):
+if st.session_state.duplicate_groups and col2.button("Clear All Duplicates"):
     for files in st.session_state.duplicate_groups.values():
         image_preprocessor.deduplicate_group(files)
     st.session_state.duplicate_groups = {}
@@ -137,6 +137,7 @@ if selected_file:
 # endregion
 
 # region Export
+st.header("Export results")
 if "zip_prepared" not in st.session_state:
     st.session_state.zip_prepared = False
 left, right, _, _ = st.columns(4)
