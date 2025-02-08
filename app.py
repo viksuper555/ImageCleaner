@@ -1,20 +1,12 @@
+import io
 import os
+import zipfile
+
 import streamlit as st
 from PIL import Image
 from image_preprocessor import ImagePreprocessor
 
 DATA_PATH_KEY = "data_path"
-
-st.title("Duplicate Image Cleaner")
-
-# region Load data
-col1, _ = st.columns(2)
-data_path = col1.text_input("Enter the path to your image directory:", value="data")
-
-if DATA_PATH_KEY not in st.session_state or st.session_state[DATA_PATH_KEY] != data_path:
-    st.session_state[DATA_PATH_KEY] = data_path
-    st.session_state.duplicate_groups = {}
-    st.session_state.no_duplicates = False
 
 if "duplicate_groups" not in st.session_state:
     st.session_state.duplicate_groups = {}
@@ -22,10 +14,39 @@ if "duplicate_groups" not in st.session_state:
 if "no_duplicates" not in st.session_state:
     st.session_state.no_duplicates = False
 
+st.title("Duplicate Image Cleaner")
+
+# region Load data
+st.header("Upload your images")
+
+# region Zip Extractor
+uploaded_zip = st.file_uploader("Upload a zip file containing images.", type=["zip"], accept_multiple_files=False)
+if uploaded_zip is None:
+    st.stop()
+
+if st.button("Load File", key="extract_zip"):
+    extract_path = "uploaded_images"
+    if not os.path.exists(extract_path):
+        os.makedirs(extract_path)
+    zip_data = io.BytesIO(uploaded_zip.read())
+    with zipfile.ZipFile(zip_data, "r") as zip_ref:
+        zip_ref.extractall(extract_path)
+    st.success("Zip file extracted.")
+    st.session_state[DATA_PATH_KEY] = extract_path
+    st.session_state.duplicate_groups = {}
+    st.session_state.no_duplicates = False
+    st.session_state.zip_prepared = False
+
+# endregion
+
+if DATA_PATH_KEY not in st.session_state:
+    st.stop()
+
+data_path = st.session_state[DATA_PATH_KEY]
+
 if not data_path or not os.path.isdir(data_path):
     st.warning("Please enter a valid directory path containing images.")
     st.stop()
-
 
 image_preprocessor = ImagePreprocessor(data_path)
 # endregion
@@ -113,4 +134,22 @@ if selected_file:
                 except Exception as e:
                     cols[idx].write(f"Error loading {file}: {e}")
 
+# endregion
+
+# region Export
+if "zip_prepared" not in st.session_state:
+    st.session_state.zip_prepared = False
+left, right, _, _ = st.columns(4)
+if left.button("Prepare Export"):
+    st.session_state.zip_prepared = True
+
+if st.session_state.zip_prepared:
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
+        for folder, _, files in os.walk(data_path):
+            for file in files:
+                file_path = os.path.join(folder, file)
+                zip_file.write(file_path, arcname=file)
+    zip_buffer.seek(0)
+    right.download_button("Download Zip", data=zip_buffer, file_name=f"{uploaded_zip.name.split('.')[0]}_clean.zip", mime="application/zip")
 # endregion
